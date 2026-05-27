@@ -15,18 +15,18 @@ PG_URI = 'postgresql://{0}:{1}@{2}:{3}/{4}'.format(os.environ['DB_USER'],
                                                    os.environ['DB_PORT'],
                                                    os.environ['DB_NAME'])
 MES_DICT = {
-    1: 'Janeiro',
-    2: 'Fevereiro',
-    3: 'Março',
-    4: 'Abril',
-    5: 'Maio',
-    6: 'Junho',
-    7: 'Julho',
-    8: 'Agosto',
-    9: 'Setembro',
-    10: 'Outubro',
-    11: 'Novembro',
-    12: 'Dezembro'
+    1: "month.january",
+    2: "month.february",
+    3: "month.march",
+    4: "month.april",
+    5: "month.may",
+    6: "month.june",
+    7: "month.july",
+    8: "month.august",
+    9: "month.september",
+    10: "month.october",
+    11: "month.november",
+    12: "month.december"
 }
 
 ESTADOS_DICT = {
@@ -76,7 +76,7 @@ def get_entenda_data(esfera=None, ufs=None, fpnd=None):
         **_get_entenda_s_carbono(informacao_df),
         **_get_entenda_s_categoria(informacao_df, fpnd_area_total_ha),
         **_get_entenda_s_desmatamento(informacao_df, esfera),
-        **_get_entenda_s_entenda(informacao_df, fpnd_area_total_ha),
+        **_get_entenda_s_entenda(informacao_df),
         **_get_entenda_s_mineracao(informacao_df),
         **_get_info_deter(desmatamento_df),
         **_get_info_prodes(desmatamento_df),
@@ -300,13 +300,13 @@ def _get_entenda_s_desmatamento(informacao_df, esfera):
     return result
 
 
-def _get_entenda_s_entenda(informacao_df, fpnd_area_total_ha):
+def _get_entenda_s_entenda(informacao_df):
     return {
         # Calculando a área total da floresta pública não destinada (fpnd_area_ha) e arredondando o resultado para duas casas decimais
         'entenda_fpnd_area_total_ha': round(informacao_df['fpnd_area_ha'].sum(), 2),
         # Calculando a quantidade equivalente de campos de futebol para a área total das FPND (fpnd_area_ha)
         # Considerando que cada campo de futebol possui aproximadamente 0.714 hectares
-        'entenda_fpnd_equivalencia_futebol_qtd': round(fpnd_area_total_ha / 0.714, 2)
+        'entenda_fpnd_equivalencia_futebol_qtd': round(informacao_df['fpnd_area_ha'].sum() / 0.714, 2)
     }
 
 
