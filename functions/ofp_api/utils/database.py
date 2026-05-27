@@ -72,7 +72,10 @@ def execute_query_to_dataframe(db_uri, query):
         engine = create_engine(db_uri, poolclass=NullPool, connect_args={'connect_timeout': 45})
 
         # Executar a consulta e retornar o resultado como um DataFrame
-        df = pd.read_sql_query(sqlalchemy_text(query), engine)
+        # Converte para string para evitar incompatibilidades entre pandas/sqlalchemy
+        # em ambientes de build com resolução diferente de dependências.
+        with engine.connect() as conn:
+            df = pd.read_sql_query(str(query), conn)
 
         # Definir a primeira coluna do DataFrame como índice
         if not df.empty:

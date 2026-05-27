@@ -1,4 +1,5 @@
-fastapi
-jenkspy
-mangum
-pandas
+fastapi==0.115.5
+jenkspy==0.4.1
+mangum==0.17.0
+pandas==2.2.1
+SQLAlchemy==2.0.29
