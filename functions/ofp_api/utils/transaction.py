@@ -29,6 +29,11 @@ MES_DICT = {
     12: "month.december"
 }
 
+MES_ABREV_DICT = {
+    1: "Jan", 2: "Fev", 3: "Mar", 4: "Abr", 5: "Mai", 6: "Jun",
+    7: "Jul", 8: "Ago", 9: "Set", 10: "Out", 11: "Nov", 12: "Dez"
+}
+
 ESTADOS_DICT = {
     "AC": {"nome": "Acre", "prefixo": "do"},
     "AP": {"nome": "Amapá", "prefixo": "do"},
@@ -387,7 +392,7 @@ def _get_info_deter(desmatamento_df):
     grouped_df.reset_index(inplace=True)
 
     # Substituir os valores de 'mes' pelos nomes usando o dicionário MES_DICT
-    grouped_df['mes'] = grouped_df['mes'].map({k: v[:3] for k, v in MES_DICT.items()})
+    grouped_df['mes'] = grouped_df['mes'].map(MES_ABREV_DICT)
     grouped_df['ano'] = grouped_df['ano'].astype(str)
     grouped_df.rename(columns={'ano': 'colorField', 'mes': 'xField'}, inplace=True)
     alerta_mensal_grafico_historico_desmatamento = grouped_df.to_dict(orient='records')
@@ -507,7 +512,7 @@ def _get_info_deter_fogo(fogo_df):
     grouped_df.reset_index(inplace=True)
 
     # Substituir os valores de 'mes' pelos nomes usando o dicionário MES_DICT
-    grouped_df['mes'] = grouped_df['mes'].map({k: v[:3] for k, v in MES_DICT.items()})
+    grouped_df['mes'] = grouped_df['mes'].map(MES_ABREV_DICT)
     grouped_df['ano'] = grouped_df['ano'].astype(str)
     grouped_df.rename(columns={'ano': 'colorField', 'mes': 'xField'}, inplace=True)
     alerta_mensal_grafico_historico_fogo = grouped_df.to_dict(orient='records')
