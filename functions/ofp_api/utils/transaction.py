@@ -3,7 +3,7 @@ from .case_style import snake_keys_to_camel # THIS_ONE
 from .database import execute_query, sql_replace_params, execute_query_to_dataframe # THIS_ONE
 from fastapi import HTTPException
 from .layer import prepare_layer_info
-from .query import DQ_MAP_DATA_LAST_MONTH, DQ_GEO_FPND_AS_MVT, DQ_MAP_DATA, DQ_ENTENDA_INFORMACAO, DQ_ENTENDA_AREA_TOTAL, DQ_ENTENDA_DESMATAMENTO, DQ_MAP_DATA_DEFORESTATION_LAST_10_YEARS, DQ_MAP_DATA_DEFORESTATION_LAST_MONTH
+from .query import DQ_MAP_DATA_LAST_MONTH, DQ_GEO_FPND_AS_MVT, DQ_MAP_DATA, DQ_ENTENDA_INFORMACAO, DQ_ENTENDA_AREA_TOTAL, DQ_ENTENDA_DESMATAMENTO, DQ_MAP_DATA_DEFORESTATION_LAST_10_YEARS, DQ_MAP_DATA_DEFORESTATION_LAST_MONTH, DQ_ENTENDA_FOGO, DQ_MAP_DATA_FOGO
 import os
 import math
 import pandas as pd
@@ -51,6 +51,9 @@ def get_entenda_data(esfera=None, ufs=None, fpnd=None):
     desmatamento_df = execute_query_to_dataframe(
         PG_URI, sql_replace_params(DQ_ENTENDA_DESMATAMENTO, params)
     )
+    fogo_df = execute_query_to_dataframe(
+        PG_URI, sql_replace_params(DQ_ENTENDA_FOGO, params)
+    )
 
     # 🔑 Denominador: depende só de UFs (não de esfera/fpnd)
     if ufs:
@@ -80,6 +83,7 @@ def get_entenda_data(esfera=None, ufs=None, fpnd=None):
         **_get_entenda_s_mineracao(informacao_df),
         **_get_info_deter(desmatamento_df),
         **_get_info_prodes(desmatamento_df),
+        **_get_info_deter_fogo(fogo_df),
         **_get_territorial_context(ufs, fpnd)
     }
 
@@ -186,6 +190,16 @@ def _get_deforestation_last_ten_years():
         df,
         'deforastation_last_10_years',
         'Desmatamento dos últimos 10 anos em ha')
+
+
+def _get_fogo_map_data():
+    df = execute_query_to_dataframe(PG_URI, DQ_MAP_DATA_FOGO)
+    return prepare_layer_info(
+        df,
+        'fogo',
+        'Área queimada acumulada em ha',
+        start_color='#FFDA80',
+        end_color='#B22222')
 
 
 def _get_entenda_s_biodiversidade(informacao_df, esfera):
@@ -435,6 +449,78 @@ def _get_info_prodes(desmatamento_df):
     }
 
 
+def _get_info_deter_fogo(fogo_df):
+
+    # Convertendo a coluna 'data' para datetime
+    fogo_df['data'] = pd.to_datetime(fogo_df['data'])
+
+    # Filtrando o DataFrame para entradas onde a fonte é 'fogo'
+    deter_fogo_df = fogo_df[fogo_df['fonte'] == 'fogo'].reset_index()
+
+    # Se não houver dados de fogo, retornar valores padrão
+    if deter_fogo_df.empty:
+        return {
+            'ultimo_mes_fogo': '',
+            'alerta_mensal_fogo_ultimo_mes_ha': 0,
+            'alerta_mensal_fogo_comparacao_mesmo_mes_ano_anterio_per': '',
+            'alerta_mensal_fogo_comparacao_mesmo_mes_ano_anterio_direcao': '',
+            'alerta_mensal_grafico_historico_fogo': []
+        }
+
+    # Encontrando o último mês disponível no DataFrame
+    ultimo_mes = deter_fogo_df['data'].dt.to_period('M').max()
+    dados_ultimo_mes = deter_fogo_df[deter_fogo_df['data'].dt.to_period('M') == ultimo_mes]
+
+    # Calculando o total de área queimada no último mês
+    alerta_mensal_fogo_ultimo_mes_ha = dados_ultimo_mes['area_ha'].sum()
+
+    # Comparando com o mesmo mês do ano anterior
+    mes_ano_anterior = ultimo_mes - 12
+    dados_ano_anterior = deter_fogo_df[deter_fogo_df['data'].dt.to_period('M') == mes_ano_anterior]
+    area_ano_anterior = dados_ano_anterior['area_ha'].sum() if not dados_ano_anterior.empty else 0
+
+    # Calculando a diferença percentual
+    if area_ano_anterior > 0:
+        diff = ((alerta_mensal_fogo_ultimo_mes_ha - area_ano_anterior) / area_ano_anterior) * 100
+        value = round(abs(diff), 2)
+        alerta_mensal_fogo_comparacao_mesmo_mes_ano_anterio_per = str(value)
+        alerta_mensal_fogo_comparacao_mesmo_mes_ano_anterio_direcao = 'maior' if diff > 0 else 'menor'
+    else:
+        alerta_mensal_fogo_comparacao_mesmo_mes_ano_anterio_per = ''
+        alerta_mensal_fogo_comparacao_mesmo_mes_ano_anterio_direcao = ''
+
+    # Mapear mês para nome
+    if pd.notna(ultimo_mes) and not pd.isna(ultimo_mes):
+        ultimo_mes_fogo_nome = MES_DICT.get(ultimo_mes.month, '')
+    else:
+        ultimo_mes_fogo_nome = ''
+
+    # Agrupar por ano/mês
+    deter_fogo_df = pd.DataFrame({
+        'ano': deter_fogo_df['data'].dt.year,
+        'mes': deter_fogo_df['data'].dt.month,
+        'area_ha': deter_fogo_df['area_ha']
+    })
+
+    # Agrupando por ano e mês e somando a área queimada
+    grouped_df = deter_fogo_df.groupby(['ano', 'mes']).agg(y_field=('area_ha', 'sum')).round(1)
+    grouped_df.reset_index(inplace=True)
+
+    # Substituir os valores de 'mes' pelos nomes usando o dicionário MES_DICT
+    grouped_df['mes'] = grouped_df['mes'].map({k: v[:3] for k, v in MES_DICT.items()})
+    grouped_df['ano'] = grouped_df['ano'].astype(str)
+    grouped_df.rename(columns={'ano': 'colorField', 'mes': 'xField'}, inplace=True)
+    alerta_mensal_grafico_historico_fogo = grouped_df.to_dict(orient='records')
+
+    return {
+        'ultimo_mes_fogo': ultimo_mes_fogo_nome,
+        'alerta_mensal_fogo_ultimo_mes_ha': round(alerta_mensal_fogo_ultimo_mes_ha, 2),
+        'alerta_mensal_fogo_comparacao_mesmo_mes_ano_anterio_per': alerta_mensal_fogo_comparacao_mesmo_mes_ano_anterio_per,
+        'alerta_mensal_fogo_comparacao_mesmo_mes_ano_anterio_direcao': alerta_mensal_fogo_comparacao_mesmo_mes_ano_anterio_direcao,
+        'alerta_mensal_grafico_historico_fogo': alerta_mensal_grafico_historico_fogo
+    }
+
+
 def _get_layers(last_month):
     layers = [
         {'value_name': 'land_cover', 'legend_title': 'Área desmatada até 2022 em ha'},
@@ -444,7 +530,8 @@ def _get_layers(last_month):
         {'value_name': 'mining', 'legend_title': 'Área de Mineração em FPND em ha'}]
     result = [
         _get_deforestation_last_month(last_month),
-        _get_deforestation_last_ten_years()
+        _get_deforestation_last_ten_years(),
+        _get_fogo_map_data()
     ]
 
     df = execute_query_to_dataframe(PG_URI, DQ_MAP_DATA)

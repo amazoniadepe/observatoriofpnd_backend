@@ -104,3 +104,27 @@ DQ_ENTENDA_DESMATAMENTO = """
         ofpnd.floresta_publica_nao_destinada fpnd on d.codigo = fpnd.codigo
     ${where_clause};
 """
+
+DQ_ENTENDA_FOGO = """
+    select
+        f.codigo,
+        "data",
+        fonte,
+        area_ha
+    from
+        ofpnd.fogo f inner join
+        ofpnd.floresta_publica_nao_destinada fpnd on f.codigo = fpnd.codigo
+    ${where_clause};
+"""
+
+DQ_MAP_DATA_FOGO = """
+    SELECT
+        codigo,
+        SUM(area_ha) AS fogo
+    FROM
+        ofpnd.fogo
+    GROUP BY
+        codigo
+    ORDER BY
+        fogo DESC;
+"""

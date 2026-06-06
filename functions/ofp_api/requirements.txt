@@ -3,3 +3,4 @@ jenkspy==0.4.1
 mangum==0.17.0
 pandas==2.2.1
 SQLAlchemy==2.0.29
+psycopg2-binary==2.9.9
